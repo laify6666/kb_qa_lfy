@@ -9,6 +9,7 @@
 - 语义检索（Top-K 相似度检索）
 - DeepSeek 带引用生成（temperature=0，不知道就说不知道）
 - FastAPI Web 服务：浏览器提问页 + JSON 接口（答案附带参考片段，可解释）
+- Agent + RAG 融合：Agent 自主决定何时调用知识库工具（`agent_rag.py`）
 - 20 题测试集自动评估（`run_eval.py`）
 
 ## 目录结构
@@ -24,6 +25,7 @@ kb_qa/
 │   ├── build_vectorstore.py# 切分 + 向量化 + 入库
 │   ├── rag_qa.py           # 单题问答（核心问答逻辑）
 │   ├── app.py              # FastAPI Web 服务（复用 rag_qa）
+│   ├── agent_rag.py        # Agent + RAG 融合（Agent 自主调用知识库）
 │   ├── run_eval.py         # 20 题评估
 │   └── rerank_test.py      # 重排对比实验
 ├── tests/
@@ -63,6 +65,20 @@ python app.py
 | `/health` | GET | 健康检查 |
 
 API Key 通过环境变量 `DEEPSEEK_API_KEY` 读取（Windows：`setx DEEPSEEK_API_KEY "你的key"`），不写入任何代码文件。
+
+## Agent + RAG 融合演示
+
+```powershell
+conda activate ai
+cd D:\桌面\learn\kb_qa\scripts
+python agent_rag.py
+```
+
+Agent 会自己判断是否需要调用知识库工具（ReAct 模式），并在终端打印决策过程。试试：
+
+1. 「什么是 RAG？」→ Agent 调用 `knowledge_base_qa`
+2. 「介绍一下模块化 RAG 的特点」→ Agent 调用 `knowledge_base_qa`
+3. 「你好」→ 闲聊，Agent 不调用工具，直接回答
 
 ## 评估结果
 
