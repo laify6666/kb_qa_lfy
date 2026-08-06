@@ -10,6 +10,7 @@
 - DeepSeek 带引用生成（temperature=0，不知道就说不知道）
 - FastAPI Web 服务：浏览器提问页 + JSON 接口（答案附带参考片段，可解释）
 - Agent + RAG 融合：Agent 自主决定何时调用知识库工具（`agent_rag.py`）
+- 多工具 Agent 工作流：知识库 + 联网搜索 + 文件读写，可完成多步任务（`agent_multi.py`）
 - 20 题测试集自动评估（`run_eval.py`）
 
 ## 目录结构
@@ -26,6 +27,7 @@ kb_qa/
 │   ├── rag_qa.py           # 单题问答（核心问答逻辑）
 │   ├── app.py              # FastAPI Web 服务（复用 rag_qa）
 │   ├── agent_rag.py        # Agent + RAG 融合（Agent 自主调用知识库）
+│   ├── agent_multi.py      # 多工具 Agent 工作流（知识库+搜索+文件）
 │   ├── run_eval.py         # 20 题评估
 │   └── rerank_test.py      # 重排对比实验
 ├── tests/
@@ -79,6 +81,20 @@ Agent 会自己判断是否需要调用知识库工具（ReAct 模式），并�
 1. 「什么是 RAG？」→ Agent 调用 `knowledge_base_qa`
 2. 「介绍一下模块化 RAG 的特点」→ Agent 调用 `knowledge_base_qa`
 3. 「你好」→ 闲聊，Agent 不调用工具，直接回答
+
+## 多工具 Agent 工作流演示
+
+```powershell
+conda activate ai
+cd D:\桌面\learn\kb_qa\scripts
+python agent_multi.py
+```
+
+Agent 拥有知识库、联网搜索、写文件、读文件四个工具，可编排多步任务（结果保存到 `kb_qa\reports\`）。试试：
+
+1. 「用知识库回答什么是 RAG，然后保存成 report.md」→ 先查知识库，再写文件
+2. 「搜索今天 AI 新闻，保存成 ai_news.md」→ 联网搜索 + 广告过滤 + 写文件
+3. 「你好」→ 闲聊，不调用工具
 
 ## 评估结果
 
