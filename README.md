@@ -11,6 +11,7 @@
 - FastAPI Web 服务：浏览器提问页 + JSON 接口（答案附带参考片段，可解释）
 - Agent + RAG 融合：Agent 自主决定何时调用知识库工具（`agent_rag.py`）
 - 多工具 Agent 工作流：知识库 + 联网搜索 + 文件读写，可完成多步任务（`agent_multi.py`）
+- Agent Web 演示：浏览器里让 Agent 自主决策并展示轨迹（`app_agent.py`）
 - 20 题测试集自动评估（`run_eval.py`）
 
 ## 目录结构
@@ -28,6 +29,7 @@ kb_qa/
 │   ├── app.py              # FastAPI Web 服务（复用 rag_qa）
 │   ├── agent_rag.py        # Agent + RAG 融合（Agent 自主调用知识库）
 │   ├── agent_multi.py      # 多工具 Agent 工作流（知识库+搜索+文件）
+│   ├── app_agent.py        # Agent Web 演示（浏览器展示决策轨迹）
 │   ├── run_eval.py         # 20 题评估
 │   └── rerank_test.py      # 重排对比实验
 ├── tests/
@@ -95,6 +97,20 @@ Agent 拥有知识库、联网搜索、写文件、读文件四个工具，可�
 1. 「用知识库回答什么是 RAG，然后保存成 report.md」→ 先查知识库，再写文件
 2. 「搜索今天 AI 新闻，保存成 ai_news.md」→ 联网搜索 + 广告过滤 + 写文件
 3. 「你好」→ 闲聊，不调用工具
+
+## Agent Web 演示
+
+```powershell
+conda activate ai
+cd D:\桌面\learn\kb_qa\scripts
+python app_agent.py
+```
+
+浏览器打开 <http://127.0.0.1:8001>（和普通 RAG 的 8000 端口分开）。页面会展示 Agent 的决策轨迹——调用了哪些工具、参数和返回。试试：
+
+1. 「什么是 RAG？」→ 决策轨迹显示调用 `knowledge_base_qa`
+2. 「搜索今天 AI 新闻」→ 决策轨迹显示调用 `search_web`
+3. 「你好」→ 无工具调用，直接回答
 
 ## 评估结果
 
