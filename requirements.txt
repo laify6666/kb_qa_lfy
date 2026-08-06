@@ -3,3 +3,5 @@ langchain-community==0.0.29
 langchain-openai
 chromadb
 sentence-transformers
+fastapi
+uvicorn

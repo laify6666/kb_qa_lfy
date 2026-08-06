@@ -1,6 +1,6 @@
 # 知识库问答系统（RAG）
 
-基于 LangChain + DeepSeek 的中文知识库问答系统。输入一篇技术文章语料，系统自动完成「加载 → 切分 → 向量化 → 检索 → 生成」，回答问题时只依据知识库内容，不编造。
+基于 LangChain + DeepSeek 的中文知识库问答系统。输入一篇技术文章语料，系统自动完成「加载 → 切分 → 向量化 → 检索 → 生成」，回答问题时只依据知识库内容，不编造。已提供 FastAPI Web 界面，可在浏览器里直接演示。
 
 ## 功能
 
@@ -8,6 +8,7 @@
 - 向量化入库（Chroma + 中文优化 embedding `bge-small-zh-v1.5`）
 - 语义检索（Top-K 相似度检索）
 - DeepSeek 带引用生成（temperature=0，不知道就说不知道）
+- FastAPI Web 服务：浏览器提问页 + JSON 接口（答案附带参考片段，可解释）
 - 20 题测试集自动评估（`run_eval.py`）
 
 ## 目录结构
@@ -21,7 +22,8 @@ kb_qa/
 │   ├── config.py           # 全局配置（模型/路径/参数，单一数据源）
 │   ├── load_documents.py   # 文档加载
 │   ├── build_vectorstore.py# 切分 + 向量化 + 入库
-│   ├── rag_qa.py           # 单题问答
+│   ├── rag_qa.py           # 单题问答（核心问答逻辑）
+│   ├── app.py              # FastAPI Web 服务（复用 rag_qa）
 │   ├── run_eval.py         # 20 题评估
 │   └── rerank_test.py      # 重排对比实验
 ├── tests/
@@ -40,7 +42,27 @@ python scripts\rag_qa.py              # 单题问答演示
 python scripts\run_eval.py            # 跑完整 20 题评估
 ```
 
-依赖：`pip install langchain==0.1.0 langchain-community==0.0.29 langchain-openai chromadb sentence-transformers`
+依赖：`pip install langchain==0.1.0 langchain-community==0.0.29 langchain-openai chromadb sentence-transformers fastapi uvicorn`
+
+## 启动 Web 界面
+
+```powershell
+conda activate ai
+cd D:\桌面\learn\kb_qa\scripts
+python app.py
+```
+
+浏览器打开 <http://127.0.0.1:8000> 即可提问。
+
+接口说明：
+
+| 接口 | 方法 | 作用 |
+|---|---|---|
+| `/` | GET | 提问页面（浏览器演示入口） |
+| `/ask` | POST | 入参 `{"question": "..."}`，返回答案 + 参考片段 |
+| `/health` | GET | 健康检查 |
+
+API Key 通过环境变量 `DEEPSEEK_API_KEY` 读取（Windows：`setx DEEPSEEK_API_KEY "你的key"`），不写入任何代码文件。
 
 ## 评估结果
 
@@ -64,5 +86,5 @@ python scripts\run_eval.py            # 跑完整 20 题评估
 
 - Q11（切分器对比）、Q12（Modular RAG 特点）存在检索召回缺口 → 尝试 Markdown 感知切分、查询改写（HyDE）
 - Q13/Q14/Q19 有生成波动 → 提示词要求「完整列出所有要点」，或多次运行取平均
-- API Key 目前硬编码在 `config.py`，生产环境应改用环境变量
-- 后续可接入重排管线（召回 k=10 + 重排取 3）、Web 界面（FastAPI）
+- Web 服务目前只监听本机 127.0.0.1 → 后续可部署到服务器（加 CORS、反向代理）
+- 后续可接入重排管线（召回 k=10 + 重排取 3）
