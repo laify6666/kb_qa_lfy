@@ -204,9 +204,11 @@ def _save_file(filename: str, content: str) -> str:
 
 
 @tool
-def write_file(filename: str, content: str) -> str:
+def write_file(filename: str, content: str = "") -> str:
     """把内容保存到 reports 目录下的文件。当用户要求把结果保存/写入文件时调用；
     filename 只需给文件名（如 report.md），content 必须是你要保存的原始内容。"""
+    if not content:
+        return "错误：content 参数为空。请重新调用 write_file，并同时提供 filename 和完整的 content 内容。"
     return _save_file(filename, content)
 
 
@@ -232,6 +234,7 @@ agent = initialize_agent(
     early_stopping_method="generate",
     max_execution_time=90,           # 硬超时，防止卡死
     return_intermediate_steps=True,
+    handle_tool_error=True,          # 工具异常时把错误返回给 LLM 重试，而不是崩溃
     handle_parsing_errors="输出格式有误：请严格按 JSON 输出工具调用，action_input 参数必须完整且非空。",
     agent_kwargs={
         "output_parser": LenientStructuredChatOutputParser(),
@@ -244,7 +247,7 @@ agent = initialize_agent(
 使用规则：
 1. AI 技术概念问题 → knowledge_base_qa；实时新闻/热点 → search_web；都不涉及 → 直接回答，不要调用工具。
 2. 多步任务允许连续调用多个工具，例如：先查知识库/搜索，再把结果保存成文件。
-3. write_file 的 content 参数必须是你要保存的**原始内容**，不要加 JSON、不要加多余说明。
+3. write_file 必须同时提供 filename 和 content 两个参数；content 必须是你要保存的**原始内容**，不要加 JSON、不要加多余说明。
 4. 最终回答直接输出纯文本，严禁输出 JSON 或工具调用指令。""",
     },
 )
@@ -275,42 +278,50 @@ def _verify_written_files(steps):
             print(f"\n⚠️ 文件内容与写入参数不一致，已自动修复为原始内容")
 
 
-# ================== 7. 交互循环 ==================
+# ================== 7. 交互循环（仅直接运行时执行） ==================
+# 用 if __name__ == "__main__" 包起来：
+# 命令行跑 python agent_multi.py 时进入循环；
+# 被 app_agent.py import 时只复用 agent，不会触发循环。
 
-print("=" * 60)
-print("🤖 多工具 Agent 工作流已启动")
-print("工具：知识库 / 联网搜索 / 写文件 / 读文件")
-print(f"📁 报告目录：{REPORTS_DIR}")
-print("输入 q 退出")
-print("=" * 60)
-print("建议试试：")
-print("  1. 用知识库回答什么是 RAG，然后保存成 report.md")
-print("  2. 搜索今天 AI 新闻，保存成 ai_news.md")
-print("  3. 你好（闲聊，不调用工具）")
+def main():
+    print("=" * 60)
+    print("🤖 多工具 Agent 工作流已启动")
+    print("工具：知识库 / 联网搜索 / 写文件 / 读文件")
+    print(f"📁 报告目录：{REPORTS_DIR}")
+    print("输入 q 退出")
+    print("=" * 60)
+    print("建议试试：")
+    print("  1. 用知识库回答什么是 RAG，然后保存成 report.md")
+    print("  2. 搜索今天 AI 新闻，保存成 ai_news.md")
+    print("  3. 你好（闲聊，不调用工具）")
 
-while True:
-    user_input = input("\n你：")
-    if user_input.lower() in ["q", "退出"]:
-        print("再见！")
-        break
+    while True:
+        user_input = input("\n你：")
+        if user_input.lower() in ["q", "退出"]:
+            print("再见！")
+            break
 
-    try:
-        result = agent.invoke({"input": user_input})
+        try:
+            result = agent.invoke({"input": user_input})
 
-        # 打印工具调用轨迹——看 Agent 是怎么编排多步任务的
-        steps = result.get("intermediate_steps", [])
-        if steps:
-            print("\n🧠 Agent 决策过程：")
-            for action, observation in steps:
-                obs = str(observation)
-                print(f"   ⚙️ 调用工具：{action.tool}")
-                print(f"      参数：{action.tool_input}")
-                print(f"      返回：{obs[:120]}{'…' if len(obs) > 120 else ''}")
+            # 打印工具调用轨迹——看 Agent 是怎么编排多步任务的
+            steps = result.get("intermediate_steps", [])
+            if steps:
+                print("\n🧠 Agent 决策过程：")
+                for action, observation in steps:
+                    obs = str(observation)
+                    print(f"   ⚙️ 调用工具：{action.tool}")
+                    print(f"      参数：{action.tool_input}")
+                    print(f"      返回：{obs[:120]}{'…' if len(obs) > 120 else ''}")
 
-        print("\n✅ 最终回答：")
-        print(result["output"])
+            print("\n✅ 最终回答：")
+            print(result["output"])
 
-        # 写文件后回读校验
-        _verify_written_files(steps)
-    except Exception as e:
-        print(f"❌ 执行出错：{str(e)}")
+            # 写文件后回读校验
+            _verify_written_files(steps)
+        except Exception as e:
+            print(f"❌ 执行出错：{str(e)}")
+
+
+if __name__ == "__main__":
+    main()
