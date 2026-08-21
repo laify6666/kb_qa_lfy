@@ -1,0 +1,3 @@
+# 奥斯卡最佳视觉效果奖
+
+奥斯卡最佳视觉效果奖（），由美国电影艺术与科学学院通过业内人士投票，颁给每年得票最高的视觉特效，奥斯卡金像奖之一。奖项早期称为最佳特殊效果奖（Best Special Effects），于1939年创立。至1963年又细分为最佳特殊视效奖（Best Special Visual Effects）与最佳音效奖（Best Sound Effects，现今为最佳音效剪辑奖（Best Sound Editing））。而1972年奥斯卡停止给予视觉特效奖项，改颁发特殊成就奖（Special Achievement Awards），然而仅发生在那年，隔届奥斯卡视觉特效再次成为年度奖项。该奖项在1996年更名为最佳视觉效果奖（Best Visual Effects）沿用至今。工程效果奖（"Engineering Effects"）特别奖（"Special Awards"）中所有“奖励在特技摄影和音响效果上的杰出成就”（"For outstanding achievement in creating special photographic and sound effects"）的奖项。特技效果（说明：1939至1962年，视觉效果奖与音效奖合并称之为“特技效果”奖。在之下的列表中，除非特别说明，否则均只列出视觉效果的被提名人）是至今此奖项提名和获奖次数最多的电影人：共有15次提名，并8次获奖。

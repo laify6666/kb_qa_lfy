@@ -1,54 +1,10 @@
-"""第 6 步：跑完整测试集，输出每题的问答报告"""
+"""第 6 步：跑完整测试集，输出每题的问答报告（复用 rag_qa.ask_rag 的混合检索+生成）"""
 
 import os
 from pathlib import Path
 
-from langchain_community.embeddings import HuggingFaceEmbeddings
-from langchain_community.vectorstores import Chroma
-from langchain_openai import ChatOpenAI
-
-from config import (
-    ANSWERS_PATH,
-    API_KEY,
-    BASE_URL,
-    CHROMA_DIR,
-    EMBEDDING_MODEL,
-    HF_OFFLINE,
-    K,
-    LLM_MODEL,
-    QUESTIONS_PATH,
-    TEMPERATURE,
-)
-
-if HF_OFFLINE:
-    os.environ["HF_HUB_OFFLINE"] = "1"
-
-embeddings = HuggingFaceEmbeddings(model_name=EMBEDDING_MODEL)
-db = Chroma(persist_directory=str(CHROMA_DIR), embedding_function=embeddings)
-
-llm = ChatOpenAI(
-    model=LLM_MODEL,
-    openai_api_key=API_KEY,
-    base_url=BASE_URL,
-    temperature=TEMPERATURE,
-)
-
-
-def ask_rag(question: str) -> str:
-    """检索 + 生成，返回回答文本"""
-    results = db.similarity_search_with_score(question, k=K)
-    context = "\n\n".join(doc.page_content for doc, _ in results)
-    messages = [
-        {"role": "system", "content": "你是一个严谨的知识库问答助手，只依据参考资料回答，不编造。"},
-        {"role": "user", "content": f"""请只根据下面的参考资料回答问题。如果资料中没有答案，请直接回答"资料中没有相关信息"。
-
-参考资料：
-{context}
-
-问题：{question}
-"""},
-    ]
-    return llm.invoke(messages).content
+from config import ANSWERS_PATH, QUESTIONS_PATH
+from rag_qa import ask_rag
 
 
 def load_questions(path: Path) -> list:

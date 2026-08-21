@@ -136,3 +136,39 @@ python app_agent.py
 - Q13/Q14/Q19 有生成波动 → 提示词要求「完整列出所有要点」，或多次运行取平均
 - Web 服务目前只监听本机 127.0.0.1 → 后续可部署到服务器（加 CORS、反向代理）
 - 后续可接入重排管线（召回 k=10 + 重排取 3）
+
+
+---
+
+# 本机扩充与调优记录（2026-08，基于原作者版本）
+
+> 本机在原作者基础上完成：语料扩充至 481 篇、混合检索、扩展评估集与两轮调优。
+> **完整调优日志（含问题→思考→决策→验证）与系统化调优流程见 [TUNING_LOG.md](TUNING_LOG.md)。**
+
+## 语料（5 → 481 篇，来源真实可查）
+
+| 来源 | 篇数 | 许可 |
+|---|---|---|
+| 中文维基百科（快照） | 120 | CC BY-SA 4.0 |
+| CMRC2018 | 100 | 学术用途 |
+| DRCD（转简体） | 80 | CC BY-SA 3.0 |
+| Langchain-Chatchat 中文文档 | 25 | 开源 |
+| THUCNews（HF 镜像） | 150 | Apache-2.0 |
+
+- 一键录入：`scripts/ingest_sources.py`；来源登记：`data/source_manifest.md`
+- 加载器支持递归子目录 + 多格式：`scripts/load_documents.py`
+- 建库：`scripts/build_vectorstore.py`（全量重建 / `--incremental` / `--dry-run`）
+
+## 检索与生成改动
+
+- **混合检索**：向量 + BM25 RRF 融合（`scripts/rag_qa.py` 的 `retrieve_hybrid`），最终上下文仍为 top-5，不增加噪声
+- **提示词**：治「过度拒答 + 要点不全」；无答案题仍正确拒答
+- 依赖注意：原 `requirements.txt` 的 `langchain==0.1.0` 与 `langchain-community==0.0.29` 互斥无法安装，本机使用兼容组合 `langchain==0.1.20 + langchain-community==0.0.38 + langchain-openai==0.1.7`
+
+## 评估
+
+- 扩展测试集：`tests/questions_full.md`（原 20 题 + 新 24 题，新题全部基于真实语料并标注来源）
+- `scripts/run_eval.py`：复用 `rag_qa.ask_rag`，默认跑 44 题
+- `scripts/diagnose.py`：与评估同源的混合检索诊断，输出 hit@5/10 与覆盖缺口标记
+- **结果**：检索 hit@5 = 100%（40/40）；可答题正确率 97.5%；无答案题 4/4 拒答、零幻觉
+- 剩余覆盖缺口：Q1（RAG 全称）、Q11（切分器对比）——需按业务需要补充真实语料

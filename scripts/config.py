@@ -12,7 +12,7 @@ KB_DIR = Path(__file__).parent.parent
 # ---- 数据路径 ----
 RAW_DIR = KB_DIR / "data" / "raw"                  # 原始语料
 CHROMA_DIR = KB_DIR / "data" / "chroma_db_zh"      # 当前向量库（bge 中文模型）
-QUESTIONS_PATH = KB_DIR / "tests" / "questions.md"  # 评估测试集
+QUESTIONS_PATH = KB_DIR / "tests" / "questions_full.md"  # 评估测试集
 ANSWERS_PATH = KB_DIR / "tests" / "answers.md"      # 评估结果输出
 
 # ---- 模型配置 ----
