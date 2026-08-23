@@ -499,3 +499,7 @@
 | 492 | data/raw/资讯新闻/thucnews_0148.md | 亚洲燃料油裂解价差收窄 跨月合约仍遭大单抛售 | https://huggingface.co/datasets/Tongjilibo/THUCNews | 2026-08-22 | Apache-2.0（THUCNews 镜像） |
 | 493 | data/raw/资讯新闻/thucnews_0149.md | 2010艺术品秋拍上演六宗最 | https://huggingface.co/datasets/Tongjilibo/THUCNews | 2026-08-22 | Apache-2.0（THUCNews 镜像） |
 | 494 | data/raw/资讯新闻/thucnews_0150.md | 欧佩克特别会议将决定较大幅度减产 | https://huggingface.co/datasets/Tongjilibo/THUCNews | 2026-08-22 | Apache-2.0（THUCNews 镜像） |
+| 495 | data/raw/测试资料/sample_doc.md | sample_doc | 本地文件：D:\rag\kb_qa\data\_samples\sample_doc.docx | 2026-08-24 | 内部资料（用户提供） |
+| 496 | data/raw/测试资料/sample_img.md | sample_img | 本地文件：D:\rag\kb_qa\data\_samples\sample_img.png | 2026-08-24 | 内部资料（用户提供） |
+| 497 | data/raw/测试资料/sample_table.md | sample_table | 本地文件：D:\rag\kb_qa\data\_samples\sample_table.xlsx | 2026-08-24 | 内部资料（用户提供） |
+| 498 | data/raw/测试资料/sample_text.md | sample_text | 本地文件：D:\rag\kb_qa\data\_samples\sample_text.txt | 2026-08-24 | 内部资料（用户提供） |
