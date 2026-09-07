@@ -1,174 +1,158 @@
-# 知识库问答系统（RAG）
+# kb_qa：中文知识库问答（RAG）
 
-基于 LangChain + DeepSeek 的中文知识库问答系统。输入一篇技术文章语料，系统自动完成「加载 → 切分 → 向量化 → 检索 → 生成」，回答问题时只依据知识库内容，不编造。已提供 FastAPI Web 界面，可在浏览器里直接演示。
+LangChain + Chroma + DeepSeek 的中文 RAG。检索、评估、Web 演示走同一条 `retrieve_hybrid`，禁止评估用一套、线上用另一套。
+
+当前链路：
+
+```
+改写（有历史才做）
+  → 向量 + BM25 RRF
+  → bge-reranker 精排
+  → 同文档邻居补全
+  → 抽取式压缩（超 2800 字才压）
+  → DeepSeek 按编号资料生成
+```
+
+回答只依据**本轮**检索块。对话历史只解「它 / 刚才」，不能当证据。无答案题应回复「资料中没有相关信息」。
+
+调优过程（问题 → 证据 → 改什么 → 怎么验收）见 [TUNING_LOG.md](TUNING_LOG.md)。
 
 ## 功能
 
-- 文档加载与切分（`RecursiveCharacterTextSplitter`，chunk_size=500, overlap=100）
-- 向量化入库（Chroma + 中文优化 embedding `bge-small-zh-v1.5`）
-- 语义检索（Top-K 相似度检索）
-- DeepSeek 带引用生成（temperature=0，不知道就说不知道）
-- FastAPI Web 服务：浏览器提问页 + JSON 接口（答案附带参考片段，可解释）
-- Agent + RAG 融合：Agent 自主决定何时调用知识库工具（`agent_rag.py`）
-- 多工具 Agent 工作流：知识库 + 联网搜索 + 文件读写，可完成多步任务（`agent_multi.py`）
-- Agent Web 演示：浏览器里让 Agent 自主决策并展示轨迹（`app_agent.py`）
-- 20 题测试集自动评估（`run_eval.py`）
+- 结构感知切分（Markdown 标题 / 维基小节 / 段落，最后才滑窗），建库与 BM25 共用 `chunking.split_document`
+- 混合检索：`bge-small-zh-v1.5` + BM25（RRF）→ `bge-reranker-base` → 邻居 ±1
+- 多轮：短期 3 轮、查询改写、同文档锚点、抽取压缩、跨会话域偏好（`ltm.json`，**不写入向量库**）
+- FastAPI 多轮演示页（`session_id` + `user_id`），答案带来源预览与 `[1][2]`
+- 可选 ReAct Agent：知识库 / 联网搜索 / 文件读写（`agent_rag.py`、`agent_multi.py`）
+- 44 题评测 + 分层诊断（文件 hit / 库内可检短语 hit / 覆盖缺口分开计）
+- 多格式入库：Office / PDF / HTML / 图片 → Markdown（`ingest_files.py`）
 
-## 目录结构
+## 指标（不要混成一个数）
 
-```
-kb_qa/
-├── data/
-│   ├── raw/                # 原始语料（5 篇中文技术文章）
-│   └── chroma_db_zh/       # 向量库（git 忽略，可重建）
-├── scripts/
-│   ├── config.py           # 全局配置（模型/路径/参数，单一数据源）
-│   ├── load_documents.py   # 文档加载
-│   ├── build_vectorstore.py# 切分 + 向量化 + 入库
-│   ├── rag_qa.py           # 单题问答（核心问答逻辑）
-│   ├── app.py              # FastAPI Web 服务（复用 rag_qa）
-│   ├── agent_rag.py        # Agent + RAG 融合（Agent 自主调用知识库）
-│   ├── agent_multi.py      # 多工具 Agent 工作流（知识库+搜索+文件）
-│   ├── app_agent.py        # Agent Web 演示（浏览器展示决策轨迹）
-│   ├── run_eval.py         # 20 题评估
-│   └── rerank_test.py      # 重排对比实验
-├── tests/
-│   ├── questions.md        # 测试集（20 题 + 答案要点 + 出处）
-│   └── answers.md          # 评估输出
-└── README.md
-```
+| 指标 | 数值 | 说明 |
+|---|---|---|
+| 文件 hit@5 | **40/40（100%）** | 来源文件进 top-5；可自动判 40 题 |
+| 短语 hit@5（库内可检） | **25/25（100%）** | 金标短语至少一条在全库里才进分母 |
+| 块级漏召回 | **0** | 短语在库里，但 top-5 块没有 |
+| 覆盖缺口 | **15** | 评估措辞在语料中不存在，**不是检索失败** |
+| 可答题正确率 | **39/40（97.5%）** | 混合检索 + 新提示词后的 LLM 评估；切分/重排之后未再跑整表 LLM |
+| 无答案题拒答 | **4/4** | Q15–18，零幻觉 |
+
+字面短语口径（缺口进分母）曾是 25/40（62%），只作对照。`run_eval.py --score-only` 的词面分会同样偏低，不要当正确率。
+
+报告：`tests/diagnose_report.md`。
 
 ## 快速开始
 
-```powershell
-conda activate ai
-cd D:\桌面\learn\kb_qa
-python scripts\build_vectorstore.py   # 首次会下载 embedding 模型，然后建库
-python scripts\rag_qa.py              # 单题问答演示
-python scripts\run_eval.py            # 跑完整 20 题评估
-```
-
-依赖：`pip install langchain==0.1.0 langchain-community==0.0.29 langchain-openai chromadb sentence-transformers fastapi uvicorn`
-
-## 启动 Web 界面
+环境：conda `ai`，Python 3.10+。API Key **只走环境变量**。
 
 ```powershell
 conda activate ai
-cd D:\桌面\learn\kb_qa\scripts
-python app.py
+$env:DEEPSEEK_API_KEY = "sk-你的key"
+cd kb_qa\scripts
+
+python build_vectorstore.py          # 首次建库；向量目录 git 忽略，克隆后必须重建
+python rag_qa.py                     # 单题
+python app.py                        # http://127.0.0.1:8000  多轮演示
 ```
 
-浏览器打开 <http://127.0.0.1:8000> 即可提问。
+演示：先问「什么是 RAG？」，再问「它的三个步骤是什么？」。长期偏好：发「以后只要百科域」，点「新会话」后再问百科题。
 
-接口说明：
+依赖（本机实际组合；仓库根 `requirements.txt` 里旧 pin 与 community 包互斥，勿照抄 0.1.0）：
 
-| 接口 | 方法 | 作用 |
+```
+langchain==0.1.20
+langchain-community==0.0.38
+langchain-openai==0.1.7
+chromadb
+sentence-transformers
+rank_bm25
+fastapi
+uvicorn
+```
+
+入库额外：`markitdown`、`rapidocr_onnxruntime`、`pymupdf`。Embedding / 重排模型首次需能访问 Hugging Face；之后可 `HF_OFFLINE=True`（见 `config.py`）。
+
+## 评估与诊断
+
+在 `scripts/` 下：
+
+```powershell
+python diagnose.py --questions ../tests/questions_full.md --k 10
+python run_eval.py                 # 调 LLM，产出 tests/answers.md
+python run_eval.py --score-only    # 只对已有答案做词面分，不花 API
+```
+
+`diagnose` / `run_eval` **不要传** `session_id` / `user_id`，保持单轮。
+
+## Web 接口
+
+| 接口 | 作用 |
+|---|---|
+| `GET /` | 多轮演示页 |
+| `POST /ask` | `{question, domain?, session_id?, user_id?}` → 答案、来源、改写句、所用域 |
+| `POST /session/clear` | 清短期记忆，长期偏好保留 |
+| `POST /memory/clear` | 清该 `user_id` 的域偏好 |
+| `GET /domains` | `data/raw` 一级目录 |
+| `GET /health` | 探活 |
+
+Agent 演示（可选）：`python app_agent.py` → http://127.0.0.1:8001
+
+## 语料
+
+约 **481 篇**，按业务域放在 `data/raw/`，来源登记 `data/source_manifest.md`。
+
+| 来源 | 约篇数 | 许可 |
 |---|---|---|
-| `/` | GET | 提问页面（浏览器演示入口） |
-| `/ask` | POST | 入参 `{"question": "..."}`，返回答案 + 参考片段 |
-| `/health` | GET | 健康检查 |
-
-API Key 通过环境变量 `DEEPSEEK_API_KEY` 读取（Windows：`setx DEEPSEEK_API_KEY "你的key"`），不写入任何代码文件。
-
-## Agent + RAG 融合演示
-
-```powershell
-conda activate ai
-cd D:\桌面\learn\kb_qa\scripts
-python agent_rag.py
-```
-
-Agent 会自己判断是否需要调用知识库工具（ReAct 模式），并在终端打印决策过程。试试：
-
-1. 「什么是 RAG？」→ Agent 调用 `knowledge_base_qa`
-2. 「介绍一下模块化 RAG 的特点」→ Agent 调用 `knowledge_base_qa`
-3. 「你好」→ 闲聊，Agent 不调用工具，直接回答
-
-## 多工具 Agent 工作流演示
-
-```powershell
-conda activate ai
-cd D:\桌面\learn\kb_qa\scripts
-python agent_multi.py
-```
-
-Agent 拥有知识库、联网搜索、写文件、读文件四个工具，可编排多步任务（结果保存到 `kb_qa\reports\`）。试试：
-
-1. 「用知识库回答什么是 RAG，然后保存成 report.md」→ 先查知识库，再写文件
-2. 「搜索今天 AI 新闻，保存成 ai_news.md」→ 联网搜索 + 广告过滤 + 写文件
-3. 「你好」→ 闲聊，不调用工具
-
-## Agent Web 演示
-
-```powershell
-conda activate ai
-cd D:\桌面\learn\kb_qa\scripts
-python app_agent.py
-```
-
-浏览器打开 <http://127.0.0.1:8001>（和普通 RAG 的 8000 端口分开）。页面会展示 Agent 的决策轨迹——调用了哪些工具、参数和返回。试试：
-
-1. 「什么是 RAG？」→ 决策轨迹显示调用 `knowledge_base_qa`
-2. 「搜索今天 AI 新闻」→ 决策轨迹显示调用 `search_web`
-3. 「你好」→ 无工具调用，直接回答
-
-## 评估结果
-
-20 题测试集（10 事实题 + 4 综合题 + 4 无答案题 + 2 概念辨析），人工对照答案要点打分：
-
-| 指标 | MiniLM（英文模型） | bge-small-zh（中文模型） |
-|---|---|---|
-| 回答正确率 | 60% ± 8%（三轮） | **77.5% ± 2.5%（两轮）** |
-| 有依据命中率 | 80% | **92.5% ± 2.5%** |
-
-无答案题（15-18）在两种模型下均为 4/4 正确拒答——「不知道就说不知道」的幻觉防线有效。
-
-## 优化历程（评估驱动的诊断链条）
-
-1. **k=3 → k=5**：正确率 50% → 65%（一个参数，肉眼可见）
-2. **重排实验**：Cross-Encoder 能把噪声块压到末尾，但「重排不能无中生有」——答案块不在候选集就救不回来
-3. **分层诊断**：打印 top-5 定位问题层——「检索稳定、生成波动」（同一批材料，模型有时用不全）
-4. **换中文 embedding（关键）**：`all-MiniLM-L6-v2`（英文为主）→ `bge-small-zh-v1.5`（中文优化），正确率 +17 个百分点，验证了「embedding 是召回瓶颈」
-
-## 已知问题与后续方向
-
-- Q11（切分器对比）、Q12（Modular RAG 特点）存在检索召回缺口 → 尝试 Markdown 感知切分、查询改写（HyDE）
-- Q13/Q14/Q19 有生成波动 → 提示词要求「完整列出所有要点」，或多次运行取平均
-- Web 服务目前只监听本机 127.0.0.1 → 后续可部署到服务器（加 CORS、反向代理）
-- 后续可接入重排管线（召回 k=10 + 重排取 3）
-
-
----
-
-# 本机扩充与调优记录（2026-08，基于原作者版本）
-
-> 本机在原作者基础上完成：语料扩充至 481 篇、混合检索、扩展评估集与两轮调优。
-> **完整调优日志（含问题→思考→决策→验证）与系统化调优流程见 [TUNING_LOG.md](TUNING_LOG.md)。**
-
-## 语料（5 → 481 篇，来源真实可查）
-
-| 来源 | 篇数 | 许可 |
-|---|---|---|
-| 中文维基百科（快照） | 120 | CC BY-SA 4.0 |
+| 中文维基百科快照 | 120 | CC BY-SA 4.0 |
 | CMRC2018 | 100 | 学术用途 |
 | DRCD（转简体） | 80 | CC BY-SA 3.0 |
-| Langchain-Chatchat 中文文档 | 25 | 开源 |
-| THUCNews（HF 镜像） | 150 | Apache-2.0 |
+| Langchain-Chatchat 文档 | 25 | 开源 |
+| THUCNews 镜像 | 150 | Apache-2.0 |
 
-- 一键录入：`scripts/ingest_sources.py`；来源登记：`data/source_manifest.md`
-- 加载器支持递归子目录 + 多格式：`scripts/load_documents.py`
-- 建库：`scripts/build_vectorstore.py`（全量重建 / `--incremental` / `--dry-run`）
+```powershell
+python ingest_sources.py                          # 批量公开语料
+python ingest_files.py --input <文件> --domain 通用 --build
+python build_vectorstore.py --dry-run
+python build_vectorstore.py --incremental
+```
 
-## 检索与生成改动
+## 目录
 
-- **混合检索**：向量 + BM25 RRF 融合（`scripts/rag_qa.py` 的 `retrieve_hybrid`），最终上下文仍为 top-5，不增加噪声
-- **提示词**：治「过度拒答 + 要点不全」；无答案题仍正确拒答
-- 依赖注意：原 `requirements.txt` 的 `langchain==0.1.0` 与 `langchain-community==0.0.29` 互斥无法安装，本机使用兼容组合 `langchain==0.1.20 + langchain-community==0.0.38 + langchain-openai==0.1.7`
+```
+kb_qa/
+├── data/raw/                 # 语料（按业务域）
+├── data/chroma_db_zh/        # 向量库 + bm25_corpus.jsonl（git 忽略）
+├── data/logs/                # qa.jsonl
+├── data/memory/              # ltm.json（git 忽略，勿进向量库）
+├── scripts/
+│   ├── config.py             # 路径 / 模型 / K / 预算，单一数据源
+│   ├── chunking.py           # 结构感知切分
+│   ├── rag_qa.py             # retrieve_hybrid + 生成
+│   ├── query_rewrite.py / session_memory.py / long_term_memory.py / context_compress.py
+│   ├── diagnose.py / run_eval.py / build_vectorstore.py
+│   ├── app.py / agent_*.py
+│   └── ingest_*.py
+├── tests/
+│   ├── questions_full.md     # 44 题
+│   ├── diagnose_report.md    # 当前检索诊断
+│   └── answers*.md           # 各轮评估留档
+├── README.md
+└── TUNING_LOG.md
+```
 
-## 评估
+## 配置要点（`scripts/config.py`）
 
-- 扩展测试集：`tests/questions_full.md`（原 20 题 + 新 24 题，新题全部基于真实语料并标注来源）
-- `scripts/run_eval.py`：复用 `rag_qa.ask_rag`，默认跑 44 题
-- `scripts/diagnose.py`：与评估同源的混合检索诊断，输出 hit@5/10 与覆盖缺口标记
-- **结果**：检索 hit@5 = 100%（40/40）；可答题正确率 97.5%；无答案题 4/4 拒答、零幻觉
-- 剩余覆盖缺口：Q1（RAG 全称）、Q11（切分器对比）——需按业务需要补充真实语料
+| 项 | 值 | 用意 |
+|---|---|---|
+| `K` | 5 | 精排后进生成的块数（扩邻居前） |
+| `RERANK_CANDIDATES` | 20 | 只重排候选池，不把整库喂给 LLM |
+| `NEIGHBOR_RADIUS` | 1 | 同文档左右各一块 |
+| `CONTEXT_MAX_CHUNKS` | 8 | 邻居后的块数上限 |
+| `CONTEXT_MAX_CHARS` | 2800 | 超了才抽句 |
+| `HISTORY_TURNS` | 3 | 短期窗口 |
+| `HF_OFFLINE` | True | 用本地已下载的 embedding / reranker |
+
+## 刻意不做
+
+更大 embedding、GraphRAG、默认走 Agent 检索、把长期记忆 upsert 进 Chroma。这些会打乱现有口径，或带偏 Q15–18 拒答。

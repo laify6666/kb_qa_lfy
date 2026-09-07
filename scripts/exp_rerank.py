@@ -26,7 +26,8 @@ for cat, no, q, srcs, _points in qs:
     if not srcs:
         continue
     judgeable += 1
-    cands = retrieve_hybrid(q, k=10)                 # [(text, source), ...]
+    # 只要 RRF 融合结果，关闭主路径里的重排/邻居，避免对照实验套娃
+    cands = retrieve_hybrid(q, k=10, rerank=False, expand=False)
     src_b = [s for _t, s in cands[:5]]
     hit_b += any(x in s or s in x for s in src_b for x in srcs)
 

@@ -2,5 +2,6 @@ __pycache__/
 *.pyc
 data/chroma_db/
 data/chroma_db_zh/
+data/memory/
 reports/
 .vscode/
